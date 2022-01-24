@@ -9,6 +9,8 @@ import java.awt.*;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.locks.ReentrantLock;
 
+import mpi.*;
+
 import javax.swing.*;
 
 public class MPJMD {
@@ -17,10 +19,6 @@ public class MPJMD {
 
     final static int N = 4000; // Number of "atoms"
     final static double BOX_WIDTH = 100.0;
-
-    final static int P = 8;
-    static CyclicBarrier barrier = new CyclicBarrier(P);
-    static ReentrantLock lock = new ReentrantLock();
 
     // Benchmarking
     final static int ITERATIONS = 5000;
@@ -65,16 +63,13 @@ public class MPJMD {
 
     static Display display = new Display();
 
-    int me, B, begin, end;
-
-    public MPJMD(int me) {
-        this.me = me;
-        this.B = N / P;
-        this.begin = me * B;
-        this.end = (me < (P - 1)) ? (begin + B) : N;
-    }
-
     public static void main(String args[]) throws Exception {
+
+        MPI.Init(args);
+
+        int me = MPI.COMM_WORLD.Rank();
+        int P = MPI.COMM_WORLD.Size();
+
         // Define initial state of atoms
 
         int sqrtN = (int) (Math.sqrt((double) N) + 0.5);
