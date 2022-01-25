@@ -7,8 +7,6 @@
 
 import java.awt.*;
 import java.util.Arrays;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.locks.ReentrantLock;
 
 import mpi.*;
 
@@ -40,7 +38,7 @@ public class MPJMD {
 
     final static int WINDOW_SIZE = 800;
     final static int DELAY = 0;
-    final static int OUTPUT_FREQ = 2500;
+    final static int OUTPUT_FREQ = 1;
 
     // Physics constants
 
@@ -53,16 +51,12 @@ public class MPJMD {
     final static int BLOCK_SIZE = 8;
 
     final static int BUFFER_SIZE = 1 + 2 * N;
-    final static int RESULT_SIZE = 1 + 2 * BLOCK_SIZE;
+    // final static int RESULT_SIZE = 1 + 2 * BLOCK_SIZE;
     final static int NUM_BLOCKS = N / BLOCK_SIZE;
 
     final static int TAG_HELLO = 0;
     final static int TAG_TASK = 1;
     final static int TAG_RESULT = 2;
-    // final static int TAG_X = 2;
-    // final static int TAG_Y = 3;
-    // final static int TAG_RESULT_X = 4;
-    // final static int TAG_RESULT_Y = 5;
     final static int TAG_GOODBYE = 3;
 
     public static void main(String args[]) throws Exception {
@@ -78,7 +72,7 @@ public class MPJMD {
         double[] x = new double[N];
         double[] y = new double[N];
         double[] buffer = new double[BUFFER_SIZE];
-        double[] resultBuffer = new double[RESULT_SIZE];
+        double[] resultBuffer = new double[BUFFER_SIZE];
         /*
          * buffer[0] == blockStart
          * buffer[i <= N] == x
@@ -136,15 +130,16 @@ public class MPJMD {
 
                 while (numBlocksReceived < NUM_BLOCKS || numHellos < numWorkers) {
 
-                    Status status = MPI.COMM_WORLD.Recv(buffer, 0, BLOCK_SIZE, MPI.INT, MPI.ANY_SOURCE, MPI.ANY_TAG);
+                    Status status = MPI.COMM_WORLD.Recv(resultBuffer, 0, BLOCK_SIZE, MPI.INT, MPI.ANY_SOURCE,
+                            MPI.ANY_TAG);
 
                     if (status.tag == TAG_RESULT) {
-                        int resultBlockStart = (int) buffer[0];
-                        for (int i = 1; i < RESULT_SIZE; i++) {
-                            if (i <= BLOCK_SIZE) {
-                                ax[resultBlockStart + i] = buffer[1 + i];
+                        int resultBlockStart = (int) resultBuffer[0];
+                        for (int i = 0; i < BUFFER_SIZE; i++) {
+                            if (i < N) {
+                                ax[i] += resultBuffer[1 + i];
                             } else {
-                                ay[resultBlockStart + i] = buffer[1 + i];
+                                ay[i - N] += resultBuffer[1 + i];
                             }
                         }
                         numBlocksReceived++;
@@ -187,7 +182,7 @@ public class MPJMD {
             System.out.println("Calculation completed in " +
                     (endTime - startTime) + " milliseconds");
         } else {
-            MPI.COMM_WORLD.Send(buffer, 0, 0, MPI.DOUBLE, 0, TAG_HELLO);
+            MPI.COMM_WORLD.Send(resultBuffer, 0, 0, MPI.DOUBLE, 0, TAG_HELLO);
 
             boolean done = false;
 
@@ -251,11 +246,11 @@ public class MPJMD {
                                         fOverR = 24.0 * ((2.0 * repel) - attract) * rSquaredInv;
                                         fx = fOverR * dx;
                                         fy = fOverR * dy;
-                                        resultBuffer[i + 1] += fx; // add this force on to i's acceleration (mass = 1)
-                                        resultBuffer[i + 1 + BLOCK_SIZE] += fy;
+                                        resultBuffer[i] += fx; // add this force on to i's acceleration (mass = 1)
+                                        resultBuffer[i + N] += fy;
 
                                         resultBuffer[j + 1] -= fx; // Newton's 3rd law
-                                        ay[j + 1 + BLOCK_SIZE] -= fy;
+                                        resultBuffer[j + 1 + N] -= fy;
                                     }
                                 }
                             }
